@@ -1,6 +1,6 @@
 # Rankings Converter
 
-Утилита генерит удобочитаемые файлы из файла вывода rankings.rb. Так же есть возможность отфильтровать результаты по категориям и сохранить все в формате json
+Утилита генерит удобочитаемые файлы из файла вывода rankings.rb. Так же есть возможность отфильтровать результаты по категориям и сохранить все в формате json. Если не нужно выводить все данные, можно запускать с флагом -r \<number>. С этим флагом утилита выдаст только по \<number> случайных продуктов из каждой категории. 
 
 ```bash
 ruby converter.rb -h
@@ -12,6 +12,7 @@ Example:
 
 Options:
   -c, --categories "cat1" "cat2"   filter output by categories
+  -r, --random <number_rows (3)>   cut output to <number_rows> randomize rows
   -j, --json     json format output
   -h, --help     print help and exit
 ```

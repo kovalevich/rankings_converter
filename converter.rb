@@ -9,9 +9,10 @@ require 'json'
 # ВНИМЕНИЕ! лень разбираться, но корректно работает только если категории обрамляем двойными кавычками
 # todo: Можно добавить фильтры по каличеству рэнков, по урлам, по рэнкам и т.д.
 class Converter
-  def initialize(categories, json = false)
+  def initialize(categories, mode = [])
     @products = {}
-    @json = json
+    @mode = mode
+    @mode[:random] = @mode[:random] == true ? 3 : @mode[:random].first.to_i unless @mode[:random].nil?
     @categories = categories
   end
 
@@ -22,14 +23,55 @@ class Converter
     res = file.scan %r{^(.*/)?([^/]*)}
     res[0][1] = 'out_' + res[0][1]
     output_file = res[0].join
-    output_file += '.json' if @json
+    output_file += '.json' if @mode[:json]
 
-    write_to_file output_file
+    output = @mode[:json] ? json : text
+    write_to_file(output_file, output)
     puts "Job done! Output file: #{output_file}"
   end
 
-  def write_to_file(file)
-    File.open(file, 'w') { |f| f.write to_s }
+  def write_to_file(file, text)
+    File.open(file, 'w') { |f| f.write text }
+  end
+
+  def json
+    filtered.to_json
+  end
+
+  def text
+    categories = filtered
+
+    txt = ''
+    categories.each do |breadcrumb, products|
+      txt += "#{breadcrumb}: \n"
+      products.each { |p| txt += "\t#{prod_to_s(p)}\n" }
+    end
+    txt
+  end
+
+  def prod_to_s(prod)
+    prod.values.join("\t")
+  end
+
+  def filtered
+    data = @categories ? @products.slice(*@categories) : @products.dup
+
+    data.each { |k, p| data[k] = p.sample(@mode[:random]) } if @mode[:random]
+    sort(add_counters(data))
+  end
+
+  def add_counters(data)
+    with_counters = {}
+
+    data.each do |k, v|
+      counters = " (products: #{v.size}/#{@products[k].size})"
+      with_counters[k + counters] = v
+    end
+    with_counters
+  end
+
+  def sort(data)
+    data.each { |category, products| data[category] = products.sort_by { |p| p[:rank] } }
   end
 
   def read_file(file)
@@ -41,18 +83,6 @@ class Converter
       end
     end
   end
-
-  def to_s
-    categories = @categories ? @products.slice(*@categories) : @products
-    return categories.to_json if @json
-
-    text = ''
-    categories.each do |breadcrumb, products|
-      text += "#{breadcrumb} (#{products.size}): \n"
-      products.sort_by { |p| p[:rank] }.each { |p| text += "\t#{p[:rank]}\t#{p[:url]}#{"\t" * 3}#{p[:name]}\n" }
-    end
-    text
-  end
 end
 
 def params
@@ -61,7 +91,24 @@ def params
     puts 'Too few arguments'
     exit
   end
-  [ARGV.shift, (ARGV & %w[-j --json]).any?, categories_from_params]
+  mode = {
+    json: param(%w[-j --json]),
+    random: param(%w[-r --random])
+  }
+  [ARGV.shift, mode, param(%w[-c --categories])]
+end
+
+def param(names)
+  return nil unless (ARGV & names).any?
+
+  collection = []
+  i = ARGV.find_index { |e| names.include? e }
+
+  until ARGV[i + 1].nil? || ARGV[i += 1].scan(/^-/).any?
+    collection << ARGV[i]
+  end
+
+  collection.any? ? collection : true
 end
 
 def help?
@@ -76,28 +123,16 @@ def help?
     
     Options:
       -c, --categories "cat1" "cat2"   filter output by categories
+      -r, --random <number_rows (3)>   cut output to <number_rows> randomize rows
       -j, --json     json format output
       -h, --help     print help and exit
   HEREDOC
   exit
 end
 
-def categories_from_params
-  categories = []
-  i = ARGV.find_index { |e| %w[-c --categories].include? e }
-  return nil unless i
-
-  until ARGV[i += 1].scan(/^-/).any?
-    categories << ARGV[i]
-    break unless ARGV[i + 1]
-  end
-
-  categories.any? ? categories : nil
-end
-
 if __FILE__ == $PROGRAM_NAME
-  file, json, categories = params
+  file, mode, categories = params
 
-  r = Converter.new(categories, json)
+  r = Converter.new(categories, mode)
   r.convert(file)
 end
