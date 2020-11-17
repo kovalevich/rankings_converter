@@ -71,7 +71,11 @@ class Converter
   end
 
   def sort(data)
-    data.each { |category, products| data[category] = products.sort_by { |p| p[:rank] } }
+    data.each do |category, products|
+      assortment = products.select { |p| p[:rank].negative? }
+      rankings = products.select { |p| p[:rank].positive? }
+      data[category] = rankings.sort_by { |p| p[:rank] }.concat(assortment)
+    end
   end
 
   def read_file(file)
@@ -79,7 +83,7 @@ class Converter
       while (line = f.gets)
         product = line.split(/\t/)
         @products[product[1]] ||= []
-        @products[product[1]] << { url: product[0], name: product[3], rank: product[2].to_i }
+        @products[product[1]] << { rank: product[2].to_i, url: product[0], name: product[3], image: product[5] }
       end
     end
   end
