@@ -54,7 +54,7 @@ class Converter
   end
 
   def filtered
-    data = @categories ? @products.slice(*@categories) : @products.dup
+    data = @categories ? @products.dup.delete_if { |k, v| !@categories.include? k } : @products.dup
 
     data.each { |k, p| data[k] = p.sample(@mode[:random]) } if @mode[:random]
     sort(add_counters(data))
